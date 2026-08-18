@@ -1,0 +1,31 @@
+// Prisma schema — READ-ONLY COPY for backend-crypto.
+// Migrations are owned by backend-system. This file exists only so that
+// `prisma generate` can produce a typed client here.
+// If you edit the schema, edit /app/backend-system/prisma/schema.prisma and
+// then copy the result over.
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CryptoWallet {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchant_id   String?  @db.Uuid
+  network       String   @default("TRON-NILE") @db.VarChar(24)
+  address       String   @db.VarChar(64)
+  purpose       String   @db.VarChar(24)
+  encrypted_key String?
+  key_iv        String?
+  key_tag       String?
+  balance_cache Decimal  @default(0) @db.Decimal(24, 6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([network, address])
+  @@map("crypto_wallets")
+}

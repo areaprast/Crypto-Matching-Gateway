@@ -3,76 +3,81 @@
 ## Original Problem Statement
 B2B P2P Matching Gateway acting as a bi-directional escrow gateway between IDR
 fiat merchants and USDT crypto merchants. Multi-matching (1-to-1, 1-to-many,
-many-to-1) with match_items pecahan. Full flow: TopUp request → matching engine
-→ crypto escrowed to hot wallet → user fiat transfer IDR peer-to-peer → confirm
+many-to-1) via `match_items`. Full flow: TopUp request → matching engine →
+crypto escrowed to hot wallet → user fiat transfer IDR peer-to-peer → confirm
 IDR received → release USDT to fiat user's wallet.
 
-## Architecture (as of Aug 18, 2026 — post-refactor)
+## Architecture (Aug 18, 2026)
 ```
                      ┌─────────────────────┐
 Browser (Next.js)    │   FastAPI proxy     │ (READONLY supervisor)
       :3000  ───────▶│      :8001          │
                      └────────┬────────────┘
-                              │
               ┌───────────────┴───────────────┐
-              │                               │
               ▼                               ▼
    ┌─────────────────────┐        ┌──────────────────────┐
    │ backend-system      │        │ backend-crypto        │
    │ Express :8002       │        │ Express :8003         │
    │ • matching engine   │───────▶│ • TronWeb + Nile      │
    │ • orders / matches  │  HTTP  │ • hot wallet + vault  │
-   │ • auth / apikeys    │ internal│ • send-usdt endpoint │
-   │ • webhooks / exports│  token  │ • encrypted PK       │
+   │ • auth (merchant +  │ internal│ • send-usdt endpoint │
+   │   admin), webhooks, │  token  │ • Prisma ORM only    │
+   │   exports, admin    │        │  (no migrations)      │
+   │ • Prisma + pg       │        │                      │
    └──────────┬──────────┘        └──────────┬───────────┘
               │                              │
               └──────────────┬───────────────┘
                              ▼
                  ┌────────────────────────┐
-                 │  PostgreSQL @ :5432    │  (shared)
+                 │  PostgreSQL @ :5432    │  (Prisma-managed schema)
                  │  Redis     @ :6379     │
                  └────────────────────────┘
 ```
 
+## Data layer — Prisma
+- **Source of truth**: `/app/backend-system/prisma/schema.prisma`.
+- **Migrations**: `/app/backend-system/prisma/migrations/` — created via
+  `npx prisma migrate dev --name <label>` in backend-system. To apply on a
+  fresh DB: `cd /app/backend-system && npx prisma migrate deploy`.
+- **backend-crypto**: has its own `prisma/schema.prisma` (subset — only
+  `CryptoWallet` model) so `prisma generate` can produce a typed client.
+  It does NOT own migrations — updates flow: edit system schema → migrate →
+  copy relevant models into crypto schema → `prisma generate` inside crypto.
+- **backend-system db.js** exposes both `prisma` (typed) and `query`/`tx`
+  (pg raw SQL) so existing routes with hand-written joins keep working while
+  Prisma manages the schema.
+- **backend-crypto** is fully Prisma (no pg dependency).
+
+Models: `Admin`, `Merchant`, `MerchantApiKey`, `CryptoWallet`, `Order`,
+`Match`, `MatchItem`, `Transaction`, `Settlement`, `WebhookDelivery`.
+
 ## Tech Stack
-- **Frontend**: **Next.js 14.2.15** (pages router) — routes under `src/pages/`, screens under `src/screens/`. `yarn start` = `next dev -p 3000 -H 0.0.0.0`.
-- **Backend System**: Node.js + Express (`/app/backend-system`) — matching engine, orders, matches, auth (JWT + HMAC API keys), settlements, transactions, webhooks, signed CSV exports. Talks to backend-crypto via internal HTTP with shared `INTERNAL_API_TOKEN`.
-- **Backend Crypto**: Node.js + Express (`/app/backend-crypto`) — owns TronWeb, hot wallet AES-GCM vault, `/internal/tron/send-usdt` for release, and `/api/crypto/*` public read endpoints. Provisions the hot wallet on first boot.
-- **Database**: PostgreSQL 15 shared by both backends (users `p2papp`, db `p2p_gateway`).
-- **Cache**: Redis 7 (ready for BullMQ; not yet used).
-- **Blockchain**: TRON Nile testnet via `tronweb` v6. Broadcasts MOCKED (simulated txids) per user's MVP choice — flip `simulate=false` in `/app/backend-crypto/src/server.js` sendUsdt() when hot wallet is funded.
-- **Auth**: JWT for dashboard sessions; API key + HMAC secret + IP whitelist for M2M.
-- **Webhooks**: `match.created` / `match.escrowed` / `match.released` fan-out to both merchants, HMAC-SHA256 (`X-P2P-Signature: t=…,v1=…`), 5-attempt exponential retry.
-- **Signed exports**: monthly CSV signed with the same `webhook_secret`.
+- Frontend: Next.js 14.2.15 (pages router). Routes under `src/pages/`, screen
+  components under `src/screens/` (merchant + `screens/admin/*`).
+- backend-system: Node.js + Express (matching engine, orders, matches, JWT +
+  API key + HMAC auth, webhooks, signed CSV exports, admin console).
+- backend-crypto: Node.js + Express (TronWeb hot wallet vault, `/internal/tron/send-usdt`).
+- Database: PostgreSQL 15 (Prisma migrations).
+- Cache: Redis 7 (available for BullMQ).
+- Blockchain: TRON Nile testnet via `tronweb`, broadcasts MOCKED (simulated txids).
 
-## Request routing (via FastAPI proxy)
-- `GET /api/crypto/*`                → backend-crypto :8003
-- All other `/api/*`                 → backend-system :8002
-- Backend-system → backend-crypto: `POST /internal/tron/send-usdt` (release flow)
-
-## Database Schema
-`merchants` (+ webhook_secret), `merchant_apikeys`, `crypto_wallets`, `orders`,
-`matches`, `match_items`, `transactions`, `settlements`, `webhook_deliveries`.
-
-## What's Implemented
-- Full auth (register w/ auto webhook_secret, JWT login).
-- Order book with bidirectional listing + side/type role enforcement.
+## Features implemented
+- Auth: merchant JWT + register (auto webhook_secret), admin JWT, API key + HMAC + IP whitelist.
+- Order book bi-directional with side/type role enforcement.
 - Matching engine (transactional, price/time priority, 1-to-many & many-to-1).
-- Escrow → confirm-fiat → release flow (release delegated to backend-crypto).
-- Webhook fan-out with signed HMAC, retry queue, manual redeliver.
-- Signed monthly CSV export (headers + in-file footer).
-- Dashboard (Next.js): Overview KPIs + live book, Order Book, My Orders,
-  Matches master-detail (pecahan visualization + escrow/release actions),
-  Ledger, Hot Wallet, Settlements, API Keys, Webhooks, Exports.
+- Escrow → confirm-fiat → release (release delegated to backend-crypto).
+- Webhook fan-out signed HMAC (`match.created` / `.escrowed` / `.released`), retry queue, manual redeliver.
+- Signed monthly CSV export with in-file + header signature.
+- Merchant dashboard: Overview, Order Book, My Orders, Matches, Ledger, Hot Wallet, Settlements, API Keys, Webhooks, Exports.
+- **Admin console** (`/admin/*`): Overview, Merchants (suspend/activate), Orders/Matches/Ledger/Settlements with per-merchant filter, Hot Wallets CRUD, API Keys CRUD, Webhooks CRUD.
 
 ## Test Credentials
-- `fiat@demo.com / fiat123456` (FIAT merchant)
-- `crypto@demo.com / crypto123456` (CRYPTO merchant)
+See `/app/memory/test_credentials.md`.
 
 ## Backlog
-- **P1** Real Tron Nile broadcasts once hot wallet is funded (flip `simulate=false`).
-- **P1** TronGrid deposit poller in backend-crypto so escrow auto-confirms on-chain.
-- **P2** BullMQ + Redis worker for high-throughput matching.
-- **P2** WebSocket push for order book (replace polling).
-- **P2** Webhook test-event sender + delivery replay UI polish.
-- **P3** Per-API-key rate limits + audit log for admin actions.
+- P1 Real TRON Nile broadcasts (flip `simulate=false` when hot wallet funded).
+- P1 TronGrid deposit poller in backend-crypto (auto-confirm on-chain deposits).
+- P2 BullMQ worker for high-throughput matching.
+- P2 WebSocket push (replace polling).
+- P2 Webhook test-event sender.
+- P3 Per-key rate limits + admin audit log.

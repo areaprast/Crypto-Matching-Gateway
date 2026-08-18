@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Pool } = require('pg');
+const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
@@ -18,10 +18,19 @@ const env = {
   INTERNAL_API_TOKEN: process.env.INTERNAL_API_TOKEN,
 };
 
-// ---------- PostgreSQL (shared with backend-system) ----------
-const pool = new Pool({ connectionString: env.DATABASE_URL, max: 10 });
-pool.on('error', (e) => console.error('[crypto/pg]', e.message));
-const query = (t, p) => pool.query(t, p);
+// ---------- Prisma (shared schema, generated locally) ----------
+const prisma = new PrismaClient({ log: ['error', 'warn'] });
+
+// Safe JSON for BigInt returned by Prisma raw counts, if any.
+if (typeof BigInt.prototype.toJSON !== 'function') {
+  BigInt.prototype.toJSON = function () { return Number(this); };
+}
+
+// Serialise Decimal fields (balance_cache) to string for the wire.
+function serializeWallet(w) {
+  if (!w) return w;
+  return { ...w, balance_cache: w.balance_cache?.toString?.() ?? w.balance_cache };
+}
 
 // ---------- AES-256-GCM vault for private keys ----------
 function getKey() {
@@ -77,14 +86,20 @@ async function sendUsdt({ wallet, toAddress, amount, simulate = true }) {
 }
 
 async function ensureHotWallet() {
-  const { rows } = await query(`SELECT COUNT(*)::INT AS c FROM crypto_wallets WHERE purpose = 'HOT_ESCROW'`);
-  if (rows[0].c === 0) {
+  const count = await prisma.cryptoWallet.count({ where: { purpose: 'HOT_ESCROW' } });
+  if (count === 0) {
     const w = await generateWallet();
-    await query(
-      `INSERT INTO crypto_wallets (network, address, purpose, encrypted_key, key_iv, key_tag, balance_cache)
-       VALUES ($1,$2,'HOT_ESCROW',$3,$4,$5,0)`,
-      ['TRON-NILE', w.address, w.encrypted_key, w.key_iv, w.key_tag]
-    );
+    await prisma.cryptoWallet.create({
+      data: {
+        network: 'TRON-NILE',
+        address: w.address,
+        purpose: 'HOT_ESCROW',
+        encrypted_key: w.encrypted_key,
+        key_iv: w.key_iv,
+        key_tag: w.key_tag,
+        balance_cache: 0,
+      },
+    });
     console.log('[BOOT] Hot wallet initialized:', w.address);
   }
 }
@@ -102,32 +117,36 @@ app.get('/api/health', (_req, res) =>
 
 // PUBLIC crypto info (called by frontend via FastAPI proxy).
 app.get('/api/crypto/hot-wallet', async (_req, res) => {
-  const { rows } = await query(
-    `SELECT id, address, network, balance_cache, created_at
-     FROM crypto_wallets WHERE purpose='HOT_ESCROW' LIMIT 1`
-  );
-  res.json({ wallet: rows[0] || null, network: env.TRON_NETWORK, contract: env.USDT_CONTRACT });
+  const w = await prisma.cryptoWallet.findFirst({
+    where: { purpose: 'HOT_ESCROW' },
+    select: { id: true, address: true, network: true, balance_cache: true, created_at: true },
+  });
+  res.json({ wallet: serializeWallet(w), network: env.TRON_NETWORK, contract: env.USDT_CONTRACT });
 });
 
 app.post('/api/crypto/hot-wallet/refresh', async (_req, res) => {
-  const { rows: [hot] } = await query(`SELECT * FROM crypto_wallets WHERE purpose='HOT_ESCROW' LIMIT 1`);
+  const hot = await prisma.cryptoWallet.findFirst({ where: { purpose: 'HOT_ESCROW' } });
   if (!hot) return res.status(404).json({ error: 'no hot wallet' });
   const bal = await fetchUsdtBalance(hot.address);
-  if (bal !== null) await query(`UPDATE crypto_wallets SET balance_cache=$2 WHERE id=$1`, [hot.id, bal]);
+  if (bal !== null) {
+    await prisma.cryptoWallet.update({ where: { id: hot.id }, data: { balance_cache: bal } });
+  }
   res.json({ address: hot.address, usdt_balance: bal, cached: bal === null });
 });
 
 app.post('/api/crypto/hot-wallet/init', async (_req, res) => {
-  const existing = await query(`SELECT * FROM crypto_wallets WHERE purpose='HOT_ESCROW' LIMIT 1`);
-  if (existing.rows[0]) return res.json({ wallet: existing.rows[0], created: false });
+  const existing = await prisma.cryptoWallet.findFirst({ where: { purpose: 'HOT_ESCROW' } });
+  if (existing) return res.json({ wallet: serializeWallet(existing), created: false });
   const w = await generateWallet();
-  const { rows } = await query(
-    `INSERT INTO crypto_wallets (network, address, purpose, encrypted_key, key_iv, key_tag, balance_cache)
-     VALUES ($1,$2,'HOT_ESCROW',$3,$4,$5,0)
-     RETURNING id, address, network, balance_cache, created_at`,
-    ['TRON-NILE', w.address, w.encrypted_key, w.key_iv, w.key_tag]
-  );
-  res.status(201).json({ wallet: rows[0], created: true });
+  const created = await prisma.cryptoWallet.create({
+    data: {
+      network: 'TRON-NILE', address: w.address, purpose: 'HOT_ESCROW',
+      encrypted_key: w.encrypted_key, key_iv: w.key_iv, key_tag: w.key_tag,
+      balance_cache: 0,
+    },
+    select: { id: true, address: true, network: true, balance_cache: true, created_at: true },
+  });
+  res.status(201).json({ wallet: serializeWallet(created), created: true });
 });
 
 // INTERNAL — called only by backend-system for release step. Requires shared token.
@@ -145,7 +164,7 @@ app.post('/internal/wallet/generate', requireInternalToken, async (_req, res) =>
 app.post('/internal/tron/send-usdt', requireInternalToken, async (req, res) => {
   const { toAddress, amount, simulate } = req.body || {};
   if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress + amount required' });
-  const { rows: [hot] } = await query(`SELECT * FROM crypto_wallets WHERE purpose='HOT_ESCROW' LIMIT 1`);
+  const hot = await prisma.cryptoWallet.findFirst({ where: { purpose: 'HOT_ESCROW' } });
   if (!hot) return res.status(500).json({ error: 'no hot wallet' });
   try {
     const r = await sendUsdt({ wallet: hot, toAddress, amount: Number(amount), simulate: simulate !== false });

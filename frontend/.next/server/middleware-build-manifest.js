@@ -9,11 +9,6 @@ self.__BUILD_MANIFEST = {
   "lowPriorityFiles": [],
   "rootMainFiles": [],
   "pages": {
-    "/": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/index.js"
-    ],
     "/_app": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
@@ -24,30 +19,25 @@ self.__BUILD_MANIFEST = {
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/admin/apikeys": [
+    "/admin": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/admin/apikeys.js"
+      "static/chunks/pages/admin.js"
     ],
-    "/admin/matches": [
+    "/admin/login": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/admin/matches.js"
+      "static/chunks/pages/admin/login.js"
     ],
-    "/admin/settlements": [
+    "/admin/merchants": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/admin/settlements.js"
+      "static/chunks/pages/admin/merchants.js"
     ],
-    "/admin/transactions": [
+    "/admin/orders": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/admin/transactions.js"
-    ],
-    "/admin/wallets": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/admin/wallets.js"
+      "static/chunks/pages/admin/orders.js"
     ],
     "/admin/webhooks": [
       "static/chunks/webpack.js",

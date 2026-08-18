@@ -3,11 +3,9 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/login": "pages/login.js",
-  "/admin/transactions": "pages/admin/transactions.js",
-  "/admin/matches": "pages/admin/matches.js",
-  "/admin/settlements": "pages/admin/settlements.js",
-  "/admin/wallets": "pages/admin/wallets.js",
-  "/admin/apikeys": "pages/admin/apikeys.js",
   "/admin/webhooks": "pages/admin/webhooks.js",
-  "/": "pages/index.js"
+  "/admin/login": "pages/admin/login.js",
+  "/admin": "pages/admin.js",
+  "/admin/merchants": "pages/admin/merchants.js",
+  "/admin/orders": "pages/admin/orders.js"
 }

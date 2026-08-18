@@ -3,11 +3,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const fs = require('fs');
-const path = require('path');
 
 const env = require('./config');
-const { pool, query } = require('./db');
+require('./db'); // initialise Prisma client early
 
 const app = express();
 app.disable('x-powered-by');
@@ -36,23 +34,16 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: err.message || 'internal error' });
 });
 
-async function migrate() {
-  const sql = fs.readFileSync(path.join(__dirname, 'migrations.sql'), 'utf8');
-  await pool.query(sql);
-  console.log('[MIGRATE] schema ready');
-}
-
 async function ensureHotWallet() {
   // Hot wallet is owned by backend-crypto. We just verify one exists.
-  const { rows } = await query(`SELECT COUNT(*)::INT AS c FROM crypto_wallets WHERE purpose = 'HOT_ESCROW'`);
-  if (rows[0].c === 0) {
+  const c = await require('./db').prisma.cryptoWallet.count({ where: { purpose: 'HOT_ESCROW' } });
+  if (c === 0) {
     console.warn('[BOOT] No hot wallet yet — backend-crypto will provision one on its startup.');
   }
 }
 
 (async () => {
   try {
-    await migrate();
     await ensureHotWallet();
     require('./webhooks').startRetryLoop();
     app.listen(env.PORT, '127.0.0.1', () => {

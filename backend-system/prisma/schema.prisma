@@ -1,0 +1,215 @@
+// Prisma schema — B2B P2P Matching Gateway
+// Migrations for this schema live ONLY in this backend (backend-system).
+// backend-crypto includes a copy of this schema to generate its own client
+// but does NOT own the migrations directory.
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String   @unique @db.VarChar(160)
+  name          String   @db.VarChar(120)
+  password_hash String
+  status        String   @default("ACTIVE") @db.VarChar(16)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("admins")
+}
+
+model Merchant {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code           String   @unique @db.VarChar(32)
+  name           String   @db.VarChar(120)
+  type           String   @db.VarChar(16) // FIAT | CRYPTO
+  email          String   @unique @db.VarChar(160)
+  password_hash  String
+  webhook_url    String?
+  webhook_secret String?
+  status         String   @default("ACTIVE") @db.VarChar(16)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  apikeys      MerchantApiKey[]
+  wallets      CryptoWallet[]
+  orders       Order[]
+  settlements  Settlement[]
+  deliveries   WebhookDelivery[]
+
+  @@map("merchants")
+}
+
+model MerchantApiKey {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchant_id   String    @db.Uuid
+  label         String    @db.VarChar(60)
+  api_key       String    @unique @db.VarChar(64)
+  api_key_hash  String
+  secret_hash   String
+  ip_whitelist  String[]  @default([])
+  active        Boolean   @default(true)
+  last_used_at  DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@map("merchant_apikeys")
+}
+
+model CryptoWallet {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchant_id   String?  @db.Uuid
+  network       String   @default("TRON-NILE") @db.VarChar(24)
+  address       String   @db.VarChar(64)
+  purpose       String   @db.VarChar(24) // HOT_ESCROW | MERCHANT_PAYOUT
+  encrypted_key String?
+  key_iv        String?
+  key_tag       String?
+  balance_cache Decimal  @default(0) @db.Decimal(24, 6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  merchant Merchant? @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
+
+  @@unique([network, address])
+  @@map("crypto_wallets")
+}
+
+model Order {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchant_id              String   @db.Uuid
+  side                     String   @db.VarChar(16) // TOPUP | REDEEM
+  status                   String   @default("OPEN") @db.VarChar(24)
+  crypto_asset             String   @default("USDT") @db.VarChar(16)
+  fiat_currency            String   @default("IDR") @db.VarChar(8)
+  price_idr_per_usdt       Decimal  @db.Decimal(18, 4)
+  crypto_amount            Decimal  @db.Decimal(24, 6)
+  fiat_amount              Decimal  @db.Decimal(24, 2)
+  remaining_crypto_amount  Decimal  @db.Decimal(24, 6)
+  remaining_fiat_amount    Decimal  @db.Decimal(24, 2)
+  destination_wallet       String?  @db.VarChar(64)
+  destination_bank_name    String?  @db.VarChar(60)
+  destination_bank_account String?  @db.VarChar(40)
+  destination_bank_holder  String?  @db.VarChar(80)
+  expires_at               DateTime? @db.Timestamptz(6)
+  created_at               DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  merchant       Merchant     @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  topup_items    MatchItem[]  @relation("topup")
+  redeem_items   MatchItem[]  @relation("redeem")
+
+  @@index([side, status, price_idr_per_usdt], map: "idx_orders_open")
+  @@index([merchant_id], map: "idx_orders_merchant")
+  @@map("orders")
+}
+
+model Match {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reference           String   @unique @db.VarChar(32)
+  status              String   @default("AWAITING_ESCROW") @db.VarChar(24)
+  total_crypto_amount Decimal  @db.Decimal(24, 6)
+  total_fiat_amount   Decimal  @db.Decimal(24, 2)
+  platform_fee_crypto Decimal  @default(0) @db.Decimal(24, 6)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  items        MatchItem[]
+  transactions Transaction[]
+
+  @@map("matches")
+}
+
+model MatchItem {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id        String   @db.Uuid
+  topup_order_id  String   @db.Uuid
+  redeem_order_id String   @db.Uuid
+  crypto_amount   Decimal  @db.Decimal(24, 6)
+  fiat_amount     Decimal  @db.Decimal(24, 2)
+  status          String   @default("PENDING") @db.VarChar(24)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  match        Match         @relation(fields: [match_id], references: [id], onDelete: Cascade)
+  topup_order  Order         @relation("topup", fields: [topup_order_id], references: [id])
+  redeem_order Order         @relation("redeem", fields: [redeem_order_id], references: [id])
+  transactions Transaction[]
+
+  @@index([match_id], map: "idx_items_match")
+  @@index([topup_order_id], map: "idx_items_topup")
+  @@index([redeem_order_id], map: "idx_items_redeem")
+  @@map("match_items")
+}
+
+model Transaction {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id      String?   @db.Uuid
+  match_item_id String?   @db.Uuid
+  direction     String    @db.VarChar(16) // DEPOSIT | RELEASE | REFUND
+  network       String    @default("TRON-NILE") @db.VarChar(24)
+  asset         String    @default("USDT") @db.VarChar(16)
+  from_address  String?   @db.VarChar(64)
+  to_address    String?   @db.VarChar(64)
+  amount        Decimal   @db.Decimal(24, 6)
+  txid          String?   @db.VarChar(80)
+  block_number  BigInt?
+  status        String    @default("PENDING") @db.VarChar(24)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  confirmed_at  DateTime? @db.Timestamptz(6)
+
+  match      Match?     @relation(fields: [match_id], references: [id])
+  match_item MatchItem? @relation(fields: [match_item_id], references: [id])
+
+  @@index([match_id], map: "idx_tx_match")
+  @@index([txid], map: "idx_tx_txid")
+  @@map("transactions")
+}
+
+model Settlement {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchant_id         String   @db.Uuid
+  period_start        DateTime @db.Timestamptz(6)
+  period_end          DateTime @db.Timestamptz(6)
+  total_matches       Int      @default(0)
+  gross_volume_crypto Decimal  @default(0) @db.Decimal(24, 6)
+  gross_volume_fiat   Decimal  @default(0) @db.Decimal(24, 2)
+  platform_fee_crypto Decimal  @default(0) @db.Decimal(24, 6)
+  net_volume_crypto   Decimal  @default(0) @db.Decimal(24, 6)
+  status              String   @default("DRAFT") @db.VarChar(16)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@map("settlements")
+}
+
+model WebhookDelivery {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchant_id     String    @db.Uuid
+  event_type      String    @db.VarChar(48)
+  event_id        String    @db.VarChar(48)
+  target_url      String
+  payload         Json      @db.JsonB
+  signature       String
+  attempt         Int       @default(0)
+  max_attempts    Int       @default(5)
+  status          String    @default("PENDING") @db.VarChar(16)
+  response_status Int?
+  response_body   String?
+  next_retry_at   DateTime? @db.Timestamptz(6)
+  delivered_at    DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id, created_at(sort: Desc)], map: "idx_wh_merchant")
+  @@index([status, next_retry_at], map: "idx_wh_pending")
+  @@map("webhook_deliveries")
+}
