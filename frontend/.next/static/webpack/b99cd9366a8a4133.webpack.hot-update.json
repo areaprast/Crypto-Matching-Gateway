@@ -1,0 +1,1 @@
+{"c":["webpack"],"r":["pages/dashboard/orders"],"m":["./node_modules/next/dist/build/webpack/loaders/next-client-pages-loader.js?absolutePagePath=%2Fapp%2Ffrontend%2Fsrc%2Fpages%2Fdashboard%2Forders.js&page=%2Fdashboard%2Forders!","./src/pages/dashboard/orders.js","./src/screens/MyOrdersPage.jsx"]}

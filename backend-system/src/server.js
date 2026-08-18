@@ -28,6 +28,7 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/settlements', require('./routes/settlements'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api/exports', require('./routes/exports'));
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/stats', require('./routes/stats'));
 
 app.use((err, _req, res, _next) => {

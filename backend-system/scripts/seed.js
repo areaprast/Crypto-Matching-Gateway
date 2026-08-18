@@ -20,6 +20,13 @@ async function seed() {
 
   const fiatPass = await bcrypt.hash('fiat123456', 10);
   const cryptoPass = await bcrypt.hash('crypto123456', 10);
+  const adminPass = await bcrypt.hash('admin123456', 10);
+
+  await query(
+    `INSERT INTO admins (email, name, password_hash)
+     VALUES ('admin@demo.com','Platform Admin',$1)
+     ON CONFLICT (email) DO NOTHING`, [adminPass]
+  );
 
   await query(
     `INSERT INTO merchants (code, name, type, email, password_hash)

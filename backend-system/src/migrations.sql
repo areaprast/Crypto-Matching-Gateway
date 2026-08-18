@@ -3,6 +3,16 @@
 -- =========================================================
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- ---------- ADMINS ----------
+CREATE TABLE IF NOT EXISTS admins (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email          VARCHAR(160) UNIQUE NOT NULL,
+  name           VARCHAR(120) NOT NULL,
+  password_hash  TEXT NOT NULL,
+  status         VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ---------- MERCHANTS ----------
 CREATE TABLE IF NOT EXISTS merchants (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

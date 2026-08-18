@@ -97,6 +97,9 @@ export default function LoginPage() {
           <div style={{ marginTop: 20, fontSize: 12, color: "var(--text-muted)" }}>
             Don't have an account? <Link href="/register" data-testid="link-register" style={{ color: "#fff", textDecoration: "underline" }}>Register a merchant</Link>
           </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-dim)" }}>
+            Platform operator? <Link href="/admin/login" data-testid="link-admin-login" style={{ color: "var(--redeem)", textDecoration: "underline" }}>Admin console</Link>
+          </div>
         </div>
 
         <div
