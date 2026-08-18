@@ -19,10 +19,10 @@ self.__BUILD_MANIFEST = {
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/dashboard": [
+    "/dashboard/apikeys": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/dashboard.js"
+      "static/chunks/pages/dashboard/apikeys.js"
     ],
     "/dashboard/matches": [
       "static/chunks/webpack.js",
@@ -34,15 +34,15 @@ self.__BUILD_MANIFEST = {
       "static/chunks/main.js",
       "static/chunks/pages/dashboard/transactions.js"
     ],
+    "/dashboard/wallet": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/dashboard/wallet.js"
+    ],
     "/dashboard/webhooks": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
       "static/chunks/pages/dashboard/webhooks.js"
-    ],
-    "/login": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/login.js"
     ]
   },
   "ampFirstPages": []
