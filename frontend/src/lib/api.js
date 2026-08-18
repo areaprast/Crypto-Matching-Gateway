@@ -52,6 +52,8 @@ export const api = {
   rotateWebhookSecret: () => client.post("/webhooks/rotate-secret").then((r) => r.data),
   webhookDeliveries: () => client.get("/webhooks/deliveries").then((r) => r.data),
   redeliverWebhook: (id) => client.post(`/webhooks/deliveries/${id}/redeliver`).then((r) => r.data),
+  exportPreview: (year, month) => client.get("/exports/ledger/preview", { params: { year, month } }).then((r) => r.data),
+  exportDownloadUrl: (year, month) => `${process.env.REACT_APP_BACKEND_URL}/api/exports/ledger?year=${year}&month=${month}`,
 };
 
 export default client;

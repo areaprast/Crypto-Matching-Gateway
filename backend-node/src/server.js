@@ -29,6 +29,7 @@ app.use('/api/settlements', require('./routes/settlements'));
 app.use('/api/crypto', require('./routes/crypto'));
 app.use('/api/stats', require('./routes/stats'));
 app.use('/api/webhooks', require('./routes/webhooks'));
+app.use('/api/exports', require('./routes/exports'));
 
 app.use((err, _req, res, _next) => {
   console.error(err);

@@ -12,6 +12,7 @@ import WalletPage from "@/pages/WalletPage";
 import SettlementsPage from "@/pages/SettlementsPage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import WebhooksPage from "@/pages/WebhooksPage";
+import ExportsPage from "@/pages/ExportsPage";
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="settlements" element={<SettlementsPage />} />
           <Route path="apikeys" element={<ApiKeysPage />} />
           <Route path="webhooks" element={<WebhooksPage />} />
+          <Route path="exports" element={<ExportsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
