@@ -1,0 +1,108 @@
+{
+  "theme": "dark",
+  "archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST (Authority, Clarity, Truth)",
+  "typography": {
+    "headings": {
+      "family": "IBM Plex Sans",
+      "weight": "font-semibold",
+      "tracking": "tracking-tight",
+      "notes": "Used for dashboard titles and widget headers. Do NOT use Inter, Roboto, or Space Grotesk."
+    },
+    "body": {
+      "family": "IBM Plex Sans",
+      "weight": "font-normal",
+      "notes": "Standard UI text and navigation."
+    },
+    "data_columns": {
+      "family": "JetBrains Mono",
+      "weight": "font-medium",
+      "notes": "CRITICAL: Must use for all numeric columns (prices, USDT amounts, OrderIDs, Tx hashes) to ensure columnar alignment."
+    },
+    "hierarchy_rules": "H1 max text-5xl. H2 text-3xl. Widget headers text-sm uppercase with tracking-widest."
+  },
+  "colors": {
+    "background": "#050505",
+    "surface": "#0F0F10",
+    "border": "#222222",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A1A1AA",
+    "primary_action": "#FAFAFA",
+    "primary_action_text": "#050505",
+    "buy_topup": "#10B981", 
+    "sell_redeem": "#EF4444",
+    "warning_escrow": "#F59E0B",
+    "forbidden_colors": "Teal green/blue (#1B93A4) and #7351B7 are strictly forbidden.",
+    "tint_rule": "Tint neutral greys slightly with blue (cool) to make them feel alive."
+  },
+  "visual_enhancers": {
+    "surface_strategy": "Grid Borders (The 'Technical' Look). Expose the skeleton. Container uses border-collapse style layout. Items have subtle borders on right and bottom. 1px borders.",
+    "glassmorphism": "Only use for fixed headers or floating modals. backdrop-blur-xl, bg-black/60, border-white/10.",
+    "transparency_rule": "CRITICAL: DO NOT use complete transparent background in header, overlays, any surface that has content under it. Example: Dropdown with transparent background.",
+    "shadows": "Minimal. Institutional design prioritizes flat, crisp data over soft shadows. Use 1px borders instead."
+  },
+  "grids_and_layouts": {
+    "dashboard_grid": "MODE B: High Density Grid. Base grid-cols-1 md:grid-cols-4 lg:grid-cols-6. Tight gaps (gap-4). Every pixel utilized.",
+    "spacing": "Dense for data tables (p-2 to p-4). Generous for page wrappers (p-6 to p-8).",
+    "order_book": "Split layout. Left: TopUp (Fiat -> Crypto). Right: Redeem (Crypto -> Fiat). Dense rows.",
+    "alignment": "Numeric data right-aligned. Labels and text left-aligned.",
+    "general": "Optical alignment over geometrical alignment. Mobile-first responsive."
+  },
+  "component_strategies": {
+    "forms": "Use Shadcn Form, Input, Select. Sharp corners (rounded-none or rounded-sm max). Dark backgrounds for inputs with focus:ring-1 focus:ring-white.",
+    "tables": "Dense. No card wrappers for tables if possible. Use Grid Borders style. Sticky headers.",
+    "buttons": "Sharp corners. High contrast hover states (e.g., hover:bg-zinc-800 hover:text-white).",
+    "tabs": "Minimalist underline style or sharp pill, not soft bubbles.",
+    "data_testid": "MANDATORY: Add data-testid to all interactive elements."
+  },
+  "motion": {
+    "general": "Minimalist. Avoid bouncy/elastic animations.",
+    "interactions": "Fast transitions (100-150ms). opacity and color fades on hover.",
+    "live_order_flow": "Use Framer Motion to animate new orders entering the top of the order book (slide down + flash background color briefly)."
+  },
+  "accessibility": {
+    "contrast": "APCA standard. Text over gradients/images must have text-shadow.",
+    "focus": "focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:ring-offset-black focus-visible:ring-white",
+    "motion": "Respect prefers-reduced-motion."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "category": "Login Background / Hero Pattern",
+        "url": "https://images.unsplash.com/photo-1638864616275-9f0b291a2eb6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGRhcmslMjBnZW9tZXRyaWMlMjB0ZXh0dXJlfGVufDB8fHx8MTc4NzA0MTU2M3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Overlapping dark grey squares forming a geometric pattern on a black background"
+      }
+    ],
+    "icons": "Use Phosphor Icons (@phosphor-icons/react) for dense dashboards."
+  },
+  "3d_libraries": {
+    "recommendation": "Not strictly necessary, but can use Visx or simple Recharts for the Match Detail View (Sankey/Flow) or periodic financial recap. Minimal usage to preserve institutional seriousness."
+  },
+  "instructions_to_main_agent": [
+    "Install required dependencies: yarn add @phosphor-icons/react recharts framer-motion clsx tailwind-merge date-fns",
+    "Build a robust layout: A left sidebar (dense, dark) with routing for Dashboard Home, Order Book, Settlements, Settings.",
+    "Top header should show live Escrow Balance and active mock websocket status (e.g., 'TRON Testnet: Connected').",
+    "Order Book: Implement a dual-pane view. Left side: TopUp requests (Fiat to USDT). Right side: Redeem listings (USDT to Fiat). Use JetBrains Mono for prices.",
+    "Match Detail View: Create a visual connection component showing how a 100 USDT TopUp is split between two 50 USDT Redeem orders. Use simple HTML/SVG lines or grouped Shadcn cards.",
+    "Mock functionality: Make sure the 'Confirm IDR Received' button triggers a state change in the UI (e.g., from PARTIALLY_MATCHED to COMPLETED) and updates the ledger.",
+    "Use pure HTML + Tailwind for complex/overlapping analytical layouts, falling back to Shadcn for inputs and basic tables.",
+    "NEVER use generic 'Inter' for Headings. Use IBM Plex Sans.",
+    "DO NOT use teal green/blue (#1B93A4).",
+    "Javascript Environment: Create standard .js/.jsx files as typescript is not configured.",
+    "ALL interactive elements MUST have data-testid attributes."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use sonner for toasts."
+  ]
+}

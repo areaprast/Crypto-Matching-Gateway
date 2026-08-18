@@ -1,0 +1,4 @@
+/* Reset legacy App.css from CRA template. */
+.App {
+  min-height: 100vh;
+}

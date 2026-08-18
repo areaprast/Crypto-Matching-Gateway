@@ -1,0 +1,36 @@
+{
+  "summary": "First backend testing pass for B2B P2P Matching Gateway. All 19 pytest cases pass covering: health, auth (login/register/duplicate/401), order book, order side/type role enforcement (403 for wrong merchant type), order create + matching engine (TOPUP 40@16300 vs seeded REDEEM 30@16200 + 25@16250 produced matches with total_crypto_amount>0), match detail (401 unauth + enriched merchant names), escrow flow (item->ESCROWED + DEPOSIT tx), fiat-cannot-escrow 403, confirm-fiat/release flow (item->RELEASED + RELEASE tx + txid + released_amount + platform_fee applied), API key lifecycle (create returns one-time secret, list omits secret, PATCH toggle, DELETE), settlement generation (net = gross - fee, total_matches>=1), hot wallet (T-prefixed base58 + balance_cache), stats (all 5 sub-objects), order cancel (OPEN -> CANCELLED).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "docs/spec", "issue": "Review request specified field name `price` but actual Zod schema is `price_idr_per_usdt`; and `type: LIMIT` field does not exist in schema. Test payloads had to be corrected to match code."},
+      {"endpoint": "POST /api/matches/:id/confirm-fiat", "issue": "Review request stated 'as fiat merchant call confirm-fiat', but implementation enforces `redeem_merchant_id == req.merchant.id` i.e. only CRYPTO merchant can confirm. Code semantics (crypto merchant confirms IDR received before releasing USDT) is correct; the spec text was misleading."},
+      {"endpoint": "POST /api/auth/register", "issue": "Requires additional `code` field (VARCHAR 3-32, /^[A-Z0-9_-]+$/i) not mentioned in review request."},
+      {"endpoint": "POST /api/apikeys", "issue": "Schema field is `label` (not `name` as review implied). Response shape is `{apikey: {...}, credentials: {api_key, api_secret}}` — one-time secret nested under credentials."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_p2p_gateway.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Consider updating README / API docs to reflect real field names (`price_idr_per_usdt`, `label`, `code`) so downstream integrators do not follow the review-request wording.",
+    "Consider adding /api/matches/:id/confirm-fiat clarification: only CRYPTO (redeem) merchant may call it; document the actor mapping explicitly."
+  ],
+  "critical_code_review_comments": [
+    "matches.js confirm-fiat: fee/net computed with parseFloat + toFixed(6) — for very small amounts NUMERIC precision is fine, but consider using a decimal library for financial math to avoid rounding drift across multi-partial matches.",
+    "orders.js POST /: no explicit rate limiting; combined with matching engine trigger this is a potential DoS vector — worth adding express-rate-limit for authenticated create endpoints.",
+    "apikeys.js DELETE /:id returns {ok:true} even when the row does not belong to the caller (silent no-op on UPDATE/DELETE using merchant_id filter). Should return 404 when rowCount=0 for a better client contract.",
+    "matches.js escrow response is `{ok:true}` — does not return the ESCROWED item or the simulated deposit txid; UX/monitoring would benefit from including txid + updated item status in the response.",
+    "server.py is a FastAPI wrapper around a Node subprocess: potential single-point-of-failure if the Node child crashes silently. Add a supervisor healthcheck or a /api/health that pings the Node child (currently /api/health is proxied directly — if Node dies the proxy returns 5xx)."
+  ],
+  "updated_files": ["/app/backend/tests/test_p2p_gateway.py"],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "not tested (backend-only run)"},
+  "test_credentials": "fiat@demo.com / fiat123456 (FIAT), crypto@demo.com / crypto123456 (CRYPTO) — both seeded and verified working",
+  "seed_data_creation": "Fresh REDEEM liquidity created within tests (30@16200 + 25@16250) so matching is deterministic. Test-created merchants prefixed with TEST_. No cleanup implemented; safe as merchants/orders are inert once tests complete.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Test file at /app/backend/tests/test_p2p_gateway.py is the canonical regression suite (run with `pytest backend/tests/test_p2p_gateway.py -o addopts=''` to disable the xdist config in backend/pytest.ini). Note that seeded REDEEM orders are consumed on each successful full-flow run; the fixture `ensure_redeem_liquidity` creates fresh REDEEM orders per session so matching is guaranteed. If backend PostgreSQL is reset, seeded merchants must exist first (`/app/backend-node/scripts/seed.js`). Confirm-fiat is called by CRYPTO merchant, NOT fiat (opposite of what review request implied). Numeric fields come back as strings — cast with float() in assertions.",
+  "rca of the issue": "N/A — no bugs found; only spec/implementation naming mismatches noted as minor documentation issues."
+}
