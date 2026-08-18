@@ -27,10 +27,35 @@
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/dashboard/matches": [
+    "/admin/apikeys": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/dashboard/matches.js"
+      "static/chunks/pages/admin/apikeys.js"
+    ],
+    "/admin/matches": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/matches.js"
+    ],
+    "/admin/settlements": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/settlements.js"
+    ],
+    "/admin/transactions": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/transactions.js"
+    ],
+    "/admin/wallets": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/wallets.js"
+    ],
+    "/admin/webhooks": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/webhooks.js"
     ],
     "/login": [
       "static/chunks/webpack.js",
