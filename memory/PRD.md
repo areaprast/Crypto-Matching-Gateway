@@ -46,6 +46,15 @@ PostgreSQL (:5432)  Redis (:6379)  TronGrid (Nile)
 - `settlements` — periodic recap (gross, fee, net).
 
 ## What's Implemented (Aug 18, 2026)
+### Webhook fan-out (added Aug 18)
+- `merchants.webhook_secret` auto-generated at register + rotatable via `POST /api/webhooks/rotate-secret`.
+- `webhook_deliveries` table stores every attempt with payload, signature, response.
+- Events fired: `match.created` (on matching-engine output), `match.escrowed` (after item ESCROWED), `match.released` (after USDT release).
+- Signature: `X-P2P-Signature: t=<ts>,v1=<hex(hmac_sha256(secret, "${ts}.${bodyJson}"))>` — Stripe-style.
+- Retry schedule: 5s, 30s, 5m, 30m, 2h (up to 5 attempts). Background loop scans PENDING every 10s.
+- Manual redeliver via `POST /api/webhooks/deliveries/:id/redeliver`.
+- Frontend Webhooks page: endpoint save, secret reveal/copy/rotate, deliveries table with payload & signature inspection.
+
 ### Backend (Node.js Express)
 - `POST /api/auth/register` + `POST /api/auth/login` (JWT)
 - `GET/POST/PATCH/DELETE /api/apikeys` — CRUD with one-time secret reveal

@@ -47,6 +47,11 @@ export const api = {
   deleteApiKey: (id) => client.delete(`/apikeys/${id}`).then((r) => r.data),
   hotWallet: () => client.get("/crypto/hot-wallet").then((r) => r.data),
   refreshHotWallet: () => client.post("/crypto/hot-wallet/refresh").then((r) => r.data),
+  webhookConfig: () => client.get("/webhooks/config").then((r) => r.data),
+  saveWebhookUrl: (webhook_url) => client.put("/webhooks/config", { webhook_url }).then((r) => r.data),
+  rotateWebhookSecret: () => client.post("/webhooks/rotate-secret").then((r) => r.data),
+  webhookDeliveries: () => client.get("/webhooks/deliveries").then((r) => r.data),
+  redeliverWebhook: (id) => client.post(`/webhooks/deliveries/${id}/redeliver`).then((r) => r.data),
 };
 
 export default client;

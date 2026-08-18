@@ -2,6 +2,7 @@ const express = require('express');
 const { query, tx } = require('../db');
 const { requireJWT } = require('../middleware/auth');
 const { sendUsdt } = require('../tron');
+const { fanout } = require('../webhooks');
 const env = require('../config');
 
 const router = express.Router();
@@ -96,7 +97,26 @@ router.post('/:id/escrow', async (req, res) => {
       [req.params.id]
     );
   }).then(
-    () => res.json({ ok: true }),
+    async () => {
+      // Fire escrowed webhook to both parties.
+      const { rows: [ctx] } = await query(
+        `SELECT o1.merchant_id AS topup_mid, o2.merchant_id AS redeem_mid,
+                mi.crypto_amount, mi.fiat_amount, mi.status, m.reference
+         FROM match_items mi
+         JOIN matches m ON m.id = mi.match_id
+         JOIN orders o1 ON o1.id = mi.topup_order_id
+         JOIN orders o2 ON o2.id = mi.redeem_order_id
+         WHERE mi.id = $1`,
+        [item_id]
+      );
+      if (ctx) {
+        fanout([ctx.topup_mid, ctx.redeem_mid], 'match.escrowed', {
+          match_id: req.params.id, item_id, reference: ctx.reference,
+          crypto_amount: ctx.crypto_amount, fiat_amount: ctx.fiat_amount,
+        }).catch(() => {});
+      }
+      res.json({ ok: true });
+    },
     (e) => res.status(e.statusCode || 500).json({ error: e.message })
   );
 });
@@ -184,6 +204,24 @@ router.post('/:id/confirm-fiat', async (req, res) => {
     });
 
     res.json({ ok: true, txid: send.txid, released_amount: release.net, platform_fee: release.fee });
+
+    // Fire released webhook to both parties.
+    const { rows: [ctx] } = await query(
+      `SELECT o1.merchant_id AS topup_mid, o2.merchant_id AS redeem_mid, m.reference
+       FROM match_items mi
+       JOIN matches m ON m.id = mi.match_id
+       JOIN orders o1 ON o1.id = mi.topup_order_id
+       JOIN orders o2 ON o2.id = mi.redeem_order_id
+       WHERE mi.id = $1`,
+      [item_id]
+    );
+    if (ctx) {
+      fanout([ctx.topup_mid, ctx.redeem_mid], 'match.released', {
+        match_id: req.params.id, item_id, reference: ctx.reference,
+        released_amount: release.net, platform_fee: release.fee, txid: send.txid,
+        destination_wallet: release.topupWallet,
+      }).catch(() => {});
+    }
   } catch (e) {
     res.status(e.statusCode || 500).json({ error: e.message });
   }

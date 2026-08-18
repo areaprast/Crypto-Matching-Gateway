@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { z } = require('zod');
 const { query } = require('../db');
 const { signSession } = require('../middleware/auth');
@@ -20,12 +21,13 @@ router.post('/register', async (req, res) => {
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
   const { code, name, type, email, password, webhook_url } = parse.data;
   const hash = await bcrypt.hash(password, 10);
+  const webhookSecret = 'whsec_' + crypto.randomBytes(24).toString('hex');
   try {
     const { rows } = await query(
-      `INSERT INTO merchants (code, name, type, email, password_hash, webhook_url)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO merchants (code, name, type, email, password_hash, webhook_url, webhook_secret)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        RETURNING id, code, name, type, email, webhook_url, status, created_at`,
-      [code.toUpperCase(), name, type, email.toLowerCase(), hash, webhook_url || null]
+      [code.toUpperCase(), name, type, email.toLowerCase(), hash, webhook_url || null, webhookSecret]
     );
     const token = signSession(rows[0]);
     res.status(201).json({ merchant: rows[0], token });

@@ -3,6 +3,7 @@ const { z } = require('zod');
 const { query, tx } = require('../db');
 const { requireJWT } = require('../middleware/auth');
 const { runMatchingForOrder } = require('../engine/matching');
+const { fanout } = require('../webhooks');
 
 const router = express.Router();
 router.use(requireJWT);
@@ -101,6 +102,26 @@ router.post('/', async (req, res) => {
 
   // Trigger matching engine.
   const matches = await runMatchingForOrder(order.id);
+
+  // Fan-out match.created webhook to BOTH sides of every generated match.
+  for (const created of matches) {
+    const { rows: itemRows } = await query(
+      `SELECT mi.*,
+          o1.merchant_id AS topup_merchant_id,
+          o2.merchant_id AS redeem_merchant_id,
+          o1.destination_wallet, o2.destination_bank_name, o2.destination_bank_account
+       FROM match_items mi
+       JOIN orders o1 ON o1.id = mi.topup_order_id
+       JOIN orders o2 ON o2.id = mi.redeem_order_id
+       WHERE mi.match_id = $1`,
+      [created.match.id]
+    );
+    const merchantIds = itemRows.flatMap((it) => [it.topup_merchant_id, it.redeem_merchant_id]);
+    fanout(merchantIds, 'match.created', {
+      match: created.match,
+      items: itemRows,
+    }).catch(() => {});
+  }
 
   // Reload updated order.
   const { rows: [updated] } = await query(`SELECT * FROM orders WHERE id = $1`, [order.id]);

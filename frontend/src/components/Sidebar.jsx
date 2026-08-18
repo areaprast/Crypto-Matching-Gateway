@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, BookOpen, GitMerge, Wallet, Receipt, KeyRound, Landmark, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, GitMerge, Wallet, Receipt, KeyRound, Landmark, LogOut, Webhook } from "lucide-react";
 import { currentMerchant, clearSession } from "@/lib/session";
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { to: "/dashboard/wallet", icon: Wallet, label: "Hot Wallet", testid: "nav-wallet" },
   { to: "/dashboard/settlements", icon: Receipt, label: "Settlements", testid: "nav-settlements" },
   { to: "/dashboard/apikeys", icon: KeyRound, label: "API Keys", testid: "nav-apikeys" },
+  { to: "/dashboard/webhooks", icon: Webhook, label: "Webhooks", testid: "nav-webhooks" },
 ];
 
 export default function Sidebar() {

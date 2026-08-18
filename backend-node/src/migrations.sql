@@ -12,10 +12,16 @@ CREATE TABLE IF NOT EXISTS merchants (
   email           VARCHAR(160) UNIQUE NOT NULL,
   password_hash   TEXT NOT NULL,
   webhook_url     TEXT,
+  webhook_secret  TEXT,
   status          VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS webhook_secret TEXT;
+-- Backfill webhook_secret for any pre-existing merchants missing one.
+UPDATE merchants
+   SET webhook_secret = 'whsec_' || encode(gen_random_bytes(24), 'hex')
+ WHERE webhook_secret IS NULL;
 
 -- ---------- API KEYS ----------
 CREATE TABLE IF NOT EXISTS merchant_apikeys (
@@ -124,6 +130,28 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_tx_match ON transactions(match_id);
 CREATE INDEX IF NOT EXISTS idx_tx_txid ON transactions(txid);
+
+-- ---------- WEBHOOK DELIVERIES ----------
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_id     UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+  event_type      VARCHAR(48) NOT NULL,
+  event_id        VARCHAR(48) NOT NULL,
+  target_url      TEXT NOT NULL,
+  payload         JSONB NOT NULL,
+  signature       TEXT NOT NULL,
+  attempt         INT NOT NULL DEFAULT 0,
+  max_attempts    INT NOT NULL DEFAULT 5,
+  status          VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  -- PENDING | SUCCESS | FAILED
+  response_status INT,
+  response_body   TEXT,
+  next_retry_at   TIMESTAMPTZ,
+  delivered_at    TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_wh_merchant ON webhook_deliveries(merchant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wh_pending ON webhook_deliveries(status, next_retry_at);
 
 -- ---------- SETTLEMENTS (PERIODIC RECAP) ----------
 CREATE TABLE IF NOT EXISTS settlements (

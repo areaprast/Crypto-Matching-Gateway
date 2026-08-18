@@ -28,6 +28,7 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/settlements', require('./routes/settlements'));
 app.use('/api/crypto', require('./routes/crypto'));
 app.use('/api/stats', require('./routes/stats'));
+app.use('/api/webhooks', require('./routes/webhooks'));
 
 app.use((err, _req, res, _next) => {
   console.error(err);
@@ -58,6 +59,7 @@ async function ensureHotWallet() {
   try {
     await migrate();
     await ensureHotWallet();
+    require('./webhooks').startRetryLoop();
     app.listen(env.PORT, '127.0.0.1', () => {
       console.log(`[BOOT] Node backend listening on 127.0.0.1:${env.PORT}`);
     });
